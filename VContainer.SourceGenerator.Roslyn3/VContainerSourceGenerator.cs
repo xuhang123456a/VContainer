@@ -57,7 +57,8 @@ public class VContainerSourceGenerator : ISourceGenerator
     static void Execute(TypeMeta typeMeta, CodeWriter codeWriter, ReferenceSymbols referenceSymbols, in GeneratorExecutionContext context)
     {
         var diagnostics = new System.Collections.Generic.List<DiagnosticInfo>();
-        if (Emitter.TryEmitGeneratedInjector(typeMeta, codeWriter, referenceSymbols, diagnostics))
+        var model = InjectorModelBuilder.Build(typeMeta, referenceSymbols);
+        if (Emitter.TryEmitGeneratedInjector(model, codeWriter, diagnostics))
         {
             var fullType = typeMeta.FullTypeName
                 .Replace("global::", "")

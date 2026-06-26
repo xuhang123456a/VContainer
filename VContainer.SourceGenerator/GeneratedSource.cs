@@ -106,9 +106,14 @@ namespace VContainer.SourceGenerator
         public EquatableArray<string> MessageArgs { get; }
 
         public DiagnosticInfo(DiagnosticDescriptor descriptor, Location? location, params string[] messageArgs)
+            : this(descriptor, LocationInfo.CreateFrom(location), messageArgs)
+        {
+        }
+
+        public DiagnosticInfo(DiagnosticDescriptor descriptor, LocationInfo? location, params string[] messageArgs)
         {
             Descriptor = descriptor;
-            Location = LocationInfo.CreateFrom(location);
+            Location = location;
             MessageArgs = new EquatableArray<string>(messageArgs);
         }
 
