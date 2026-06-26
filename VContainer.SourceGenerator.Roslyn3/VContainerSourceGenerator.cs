@@ -56,13 +56,18 @@ public class VContainerSourceGenerator : ISourceGenerator
 
     static void Execute(TypeMeta typeMeta, CodeWriter codeWriter, ReferenceSymbols referenceSymbols, in GeneratorExecutionContext context)
     {
-        if (Emitter.TryEmitGeneratedInjector(typeMeta, codeWriter, referenceSymbols, in context))
+        var diagnostics = new System.Collections.Generic.List<DiagnosticInfo>();
+        if (Emitter.TryEmitGeneratedInjector(typeMeta, codeWriter, referenceSymbols, diagnostics))
         {
             var fullType = typeMeta.FullTypeName
                 .Replace("global::", "")
                 .Replace("<", "_")
                 .Replace(">", "_");
             context.AddSource($"{fullType}GeneratedInjector.g.cs", codeWriter.ToString());
+        }
+        foreach (var diagnostic in diagnostics)
+        {
+            context.ReportDiagnostic(diagnostic.ToDiagnostic());
         }
     }
 }

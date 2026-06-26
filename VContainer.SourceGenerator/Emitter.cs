@@ -1,9 +1,6 @@
 using System;
 using System.Linq;
 using Microsoft.CodeAnalysis;
-#if ROSLYN3
-using SourceProductionContext = Microsoft.CodeAnalysis.GeneratorExecutionContext;
-#endif
 using System.Text;
 using System.Collections.Generic;
 
@@ -15,13 +12,13 @@ static class Emitter
         TypeMeta typeMeta,
         CodeWriter codeWriter,
         ReferenceSymbols references,
-        in SourceProductionContext context)
+        List<DiagnosticInfo> diagnostics)
     {
         if (typeMeta.IsNested())
         {
             if (typeMeta.ExplicitInjectable)
             {
-                context.ReportDiagnostic(Diagnostic.Create(
+                diagnostics.Add(new DiagnosticInfo(
                     DiagnosticDescriptors.NestedNotSupported,
                     typeMeta.GetLocation(),
                     typeMeta.Symbol.Name));
@@ -33,7 +30,7 @@ static class Emitter
         {
             if (typeMeta.ExplicitInjectable)
             {
-                context.ReportDiagnostic(Diagnostic.Create(
+                diagnostics.Add(new DiagnosticInfo(
                     DiagnosticDescriptors.AbstractNotAllow,
                     typeMeta.GetLocation(),
                     typeMeta.TypeName));
@@ -67,14 +64,14 @@ static class Emitter
         using (codeWriter.BeginBlockScope($"class {generateTypeName} : global::VContainer.IInjector"))
         {
             codeWriter.AppendLine();
-            if (!TryEmitCreateInstanceMethod(typeMeta, codeWriter, references, in context))
+            if (!TryEmitCreateInstanceMethod(typeMeta, codeWriter, references, diagnostics))
             {
                 return false;
             }
 
             codeWriter.AppendLine();
 
-            if (!TryEmitInjectMethod(typeMeta, codeWriter, references, in context))
+            if (!TryEmitInjectMethod(typeMeta, codeWriter, references, diagnostics))
             {
                 return false;
             }
@@ -92,7 +89,7 @@ static class Emitter
         TypeMeta typeMeta,
         CodeWriter codeWriter,
         ReferenceSymbols references,
-        in SourceProductionContext context)
+        List<DiagnosticInfo> diagnostics)
     {
         using (codeWriter.BeginBlockScope(
                    "public void Inject(object instance, global::VContainer.IObjectResolver resolver, global::System.Collections.Generic.IReadOnlyList<global::VContainer.IInjectParameter> parameters)"))
@@ -114,7 +111,7 @@ static class Emitter
             {
                 if (!fieldSymbol.CanBeCallFromInternal())
                 {
-                    context.ReportDiagnostic(Diagnostic.Create(
+                    diagnostics.Add(new DiagnosticInfo(
                         DiagnosticDescriptors.PrivateFieldNotSupported,
                         fieldSymbol.Locations.FirstOrDefault() ?? typeMeta.GetLocation(),
                         fieldSymbol.Name));
@@ -123,7 +120,7 @@ static class Emitter
 
                 if (fieldSymbol.Type is ITypeParameterSymbol)
                 {
-                    context.ReportDiagnostic(Diagnostic.Create(
+                    diagnostics.Add(new DiagnosticInfo(
                         DiagnosticDescriptors.GenericsNotSupported,
                         fieldSymbol.Locations.FirstOrDefault() ?? typeMeta.GetLocation(),
                         fieldSymbol.Name));
@@ -138,7 +135,7 @@ static class Emitter
                     propSymbol.SetMethod.IsInitOnly ||
                     !propSymbol.SetMethod.CanBeCallFromInternal())
                 {
-                    context.ReportDiagnostic(Diagnostic.Create(
+                    diagnostics.Add(new DiagnosticInfo(
                         DiagnosticDescriptors.PrivatePropertyNotSupported,
                         propSymbol.Locations.FirstOrDefault() ?? typeMeta.GetLocation(),
                         propSymbol.Name));
@@ -147,7 +144,7 @@ static class Emitter
 
                 if (propSymbol.Type is ITypeParameterSymbol)
                 {
-                    context.ReportDiagnostic(Diagnostic.Create(
+                    diagnostics.Add(new DiagnosticInfo(
                         DiagnosticDescriptors.GenericsNotSupported,
                         propSymbol.Locations.FirstOrDefault() ?? typeMeta.GetLocation(),
                         propSymbol.Name));
@@ -158,7 +155,7 @@ static class Emitter
             // verify method
             if (typeMeta.InjectMethods.Count > 1)
             {
-                context.ReportDiagnostic(Diagnostic.Create(
+                diagnostics.Add(new DiagnosticInfo(
                     DiagnosticDescriptors.GenericsNotSupported,
                     typeMeta.InjectMethods.First().Locations.FirstOrDefault() ?? typeMeta.GetLocation(),
                     typeMeta.InjectMethods.First().Name));
@@ -169,7 +166,7 @@ static class Emitter
             {
                 if (!methodSymbol.CanBeCallFromInternal())
                 {
-                    context.ReportDiagnostic(Diagnostic.Create(
+                    diagnostics.Add(new DiagnosticInfo(
                         DiagnosticDescriptors.PrivateMethodNotSupported,
                         methodSymbol.Locations.FirstOrDefault() ?? typeMeta.GetLocation(),
                         methodSymbol.Name));
@@ -177,7 +174,7 @@ static class Emitter
                 }
                 if (methodSymbol.Arity > 0)
                 {
-                    context.ReportDiagnostic(Diagnostic.Create(
+                    diagnostics.Add(new DiagnosticInfo(
                         DiagnosticDescriptors.GenericsNotSupported,
                         methodSymbol.Locations.FirstOrDefault() ?? typeMeta.GetLocation(),
                         methodSymbol.Name));
@@ -338,11 +335,11 @@ static class Emitter
         TypeMeta typeMeta,
         CodeWriter codeWriter,
         ReferenceSymbols references,
-        in SourceProductionContext context)
+        List<DiagnosticInfo> diagnostics)
     {
         if (typeMeta.ExplicitInjectConstructors.Count > 1)
         {
-            context.ReportDiagnostic(Diagnostic.Create(
+            diagnostics.Add(new DiagnosticInfo(
                 DiagnosticDescriptors.MultipleCtorAttributeNotSupported,
                 typeMeta.GetLocation(),
                 typeMeta.TypeName));
@@ -359,7 +356,7 @@ static class Emitter
 
         if (constructorSymbol == null)
         {
-            context.ReportDiagnostic(Diagnostic.Create(
+            diagnostics.Add(new DiagnosticInfo(
                 DiagnosticDescriptors.ConstructorNotFound,
                 typeMeta.GetLocation(),
                 typeMeta.TypeName));
@@ -368,7 +365,7 @@ static class Emitter
 
         if (!constructorSymbol.CanBeCallFromInternal())
         {
-            context.ReportDiagnostic(Diagnostic.Create(
+            diagnostics.Add(new DiagnosticInfo(
                 DiagnosticDescriptors.PrivateConstructorNotSupported,
                 typeMeta.GetLocation(),
                 typeMeta.TypeName));
@@ -377,7 +374,7 @@ static class Emitter
 
         if (constructorSymbol.Arity > 0)
         {
-            context.ReportDiagnostic(Diagnostic.Create(
+            diagnostics.Add(new DiagnosticInfo(
                 DiagnosticDescriptors.GenericsNotSupported,
                 typeMeta.GetLocation(),
                 typeMeta.TypeName));
